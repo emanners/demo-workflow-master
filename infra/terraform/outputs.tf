@@ -44,3 +44,9 @@ output "ecs_task_role_arn" {
   description = "ARN of the ECS task IAM role"
   value       = aws_iam_role.ecs_task_role.arn
 }
+output "api_target_group_arn" {
+  description = "The ALB target-group ARN for the API service"
+  value       = aws_lb_target_group.api.arn
+}
+
+

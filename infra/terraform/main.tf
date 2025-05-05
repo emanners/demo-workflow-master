@@ -65,6 +65,11 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy_attachment" "ecs_exec_ecr" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 // IAM Role: ECS Task Role (app permissions)
 resource "aws_iam_role" "ecs_task_role" {
   name               = "${var.cluster_name}-ecs-task-role"
@@ -145,10 +150,14 @@ resource "aws_security_group" "ecs" {
     security_groups = [aws_security_group.lb.id]
   }
   egress {
+    description = "Allow all outbound (so tasks in private subnets can reach ECR & the Internet)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = [module.vpc.vpc_cidr_block]
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "solance-cluster-ecs-sg"
   }
 }
 
@@ -168,11 +177,12 @@ resource "aws_lb_target_group" "api" {
   target_type = "ip"
 
   health_check {
-    path                = "/health"
+    path                = "/actuator/health"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
+    matcher             = "200-399"
   }
   lifecycle {
     create_before_destroy = true
@@ -344,6 +354,7 @@ resource "aws_cloudwatch_event_rule" "workflow" {
   })
 }
 
+
 # 4. Point that rule at your SQS queue
 resource "aws_cloudwatch_event_target" "to_sqs" {
   rule      = aws_cloudwatch_event_rule.workflow.name
@@ -357,6 +368,11 @@ resource "aws_cloudwatch_event_permission" "allow_sqs" {
   statement_id = "AllowEventBridgeToSendToSQS"
   action       = "events:PutEvents"
   event_bus_name = aws_cloudwatch_event_bus.workflow.name
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_ecr_managed" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 
