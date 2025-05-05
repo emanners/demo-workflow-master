@@ -11,7 +11,6 @@ public class PaymentInstructionRequest {
     private String accountId;
     private String currency;
     private double amount;
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private Instant transactedAt;
     private String beneficiaryIban;
     private String paymentRef;
