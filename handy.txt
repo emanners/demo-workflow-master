@@ -1,0 +1,11 @@
+aws ecs update-service \
+  --cluster solance-cluster \
+  --service solance-cluster-api \
+  --force-new-deployment \
+  --region eu-west-1
+
+aws ecs update-service \
+  --cluster solance-cluster \
+  --service solance-cluster-worker \
+  --force-new-deployment \
+  --region eu-west-1

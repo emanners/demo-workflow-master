@@ -14,9 +14,22 @@ public class WorkflowEventRecord {
     /** Map a DynamoDB item (field -> AttributeValue) into this POJO. */
     public static WorkflowEventRecord fromDynamo(Map<String, AttributeValue> item) {
         WorkflowEventRecord r = new WorkflowEventRecord();
-        r.setEventId(item.get("eventId").s());
-        r.setDetailType(item.get("type").s());
-        r.setStatus(item.get("status").s());
+
+        AttributeValue eventIdAttr = item.get("eventId");
+        if (eventIdAttr != null) {
+            r.setEventId(eventIdAttr.s());
+        }
+
+        AttributeValue typeAttr = item.get("type");
+        if (typeAttr != null) {
+            r.setDetailType(typeAttr.s());
+        }
+
+        AttributeValue statusAttr = item.get("status");
+        if (statusAttr != null) {
+            r.setStatus(statusAttr.s());
+        }
+
         return r;
     }
 
