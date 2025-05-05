@@ -212,7 +212,8 @@ resource "aws_ecs_task_definition" "api" {
       }
       environment = [
         { name = "DDB_TABLE", value = aws_dynamodb_table.workflow.name },
-        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name }
+        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name },
+        { "name": "AWS_REGION", "value": var.aws_region }
       ]
     }
   ])
@@ -265,7 +266,9 @@ resource "aws_ecs_task_definition" "worker" {
       }
       environment = [
         { name = "DDB_TABLE", value = aws_dynamodb_table.workflow.name },
-        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name }
+        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name },
+        { name: "AWS_REGION", "value": var.aws_region },
+        { name  = "SQS_QUEUE", value = aws_sqs_queue.workflow.name}
       ]
     }
   ])
@@ -296,6 +299,64 @@ resource "aws_dynamodb_table" "workflow" {
     type = "S"
   }
 }
+
+# 1. Create the SQS queue
+resource "aws_sqs_queue" "workflow" {
+  name                       = "solance-workflow-queue"
+  visibility_timeout_seconds = 60
+  message_retention_seconds  = 1209600  # 14 days
+}
+
+# 2. Allow EventBridge to send to it
+resource "aws_sqs_queue_policy" "workflow_from_eb" {
+  queue_url = aws_sqs_queue.workflow.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sqs:SendMessage"
+      Resource  = aws_sqs_queue.workflow.arn
+      Condition = {
+        ArnEquals = {
+          "aws:SourceArn" = aws_cloudwatch_event_bus.workflow.arn
+        }
+      }
+    }]
+  })
+}
+
+# 3. Create an EventBridge rule for your four event types
+resource "aws_cloudwatch_event_rule" "workflow" {
+  name        = "workflow-rule"
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+
+  event_pattern = jsonencode({
+    "detail-type": [
+      "RegisterCustomer",
+      "OpenAccount",
+      "Deposit",
+      "Payout"
+    ]
+  })
+}
+
+# 4. Point that rule at your SQS queue
+resource "aws_cloudwatch_event_target" "to_sqs" {
+  rule      = aws_cloudwatch_event_rule.workflow.name
+  arn       = aws_sqs_queue.workflow.arn
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+}
+
+# 5. Give EventBridge permission to invoke that target
+resource "aws_cloudwatch_event_permission" "allow_sqs" {
+  principal    = "*"
+  statement_id = "AllowEventBridgeToSendToSQS"
+  action       = "events:PutEvents"
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+}
+
 
 // EventBridge Bus
 resource "aws_cloudwatch_event_bus" "workflow" {

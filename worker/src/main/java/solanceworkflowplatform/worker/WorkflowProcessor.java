@@ -1,15 +1,17 @@
 package solanceworkflowplatform.worker;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import services.model.*;
+
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
-import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;
+import io.awspring.cloud.sqs.annotation.SqsListener;
+
 
 
 import java.util.Map;
@@ -30,11 +32,12 @@ public class WorkflowProcessor {
         this.tableName = tableName;
     }
 
-    @EventListener
-    public void onEvent(PutEventsRequestEntry entry) {
+    @SqsListener("${sqs.queue.workflow.name}")
+    public void onEvent(String raw) {
         WorkflowEvent evt;
         try {
-            evt = mapper.readValue(entry.detail(), WorkflowEvent.class);
+            JsonNode envelope = mapper.readTree(raw);
+            evt = mapper.treeToValue(envelope.get("detail"), WorkflowEvent.class);
         } catch (Exception e) {
             // log and skip
             return;
