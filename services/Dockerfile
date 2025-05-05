@@ -1,19 +1,13 @@
 # services/api/Dockerfile
 
-# 1. Build stage
-FROM maven:3.8.7-eclipse-temurin-17 AS build
-WORKDIR /services
-# Copy pom first to leverage Docker cache
-COPY pom.xml .
-# Copy source and build
-COPY src ./src
-RUN mvn clean package -DskipTests -DskipDocker
+# Stage 1: Build only the services module
+FROM maven:3.8.4-eclipse-temurin-17 AS builder
+WORKDIR /workspace
+COPY . .
+RUN mvn clean package -pl services -am -DskipTests
 
-# 2. Runtime stage
-FROM eclipse-temurin:17-jre-jammy
-WORKDIR /services
-# Copy the Spring Boot fat JAR
-COPY --from=build /services/target/*.jar app.jar
-# Expose the HTTP port
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/services/app.jar"]
+# Stage 2: Run the service
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=builder /workspace/services/target/services-*.jar app.jar
+ENTRYPOINT ["java","-jar","app.jar"]
