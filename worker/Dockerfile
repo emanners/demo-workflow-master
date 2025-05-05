@@ -1,15 +1,23 @@
-# services/worker/Dockerfile
+# worker/Dockerfile
 
-# 1. Build stage
-FROM maven:3.8.7-eclipse-temurin-17 AS build
-WORKDIR /worker
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests -DskipDocker
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM maven:3.8.4-eclipse-temurin-17 AS builder
+WORKDIR /workspace
 
-# 2. Runtime stage
-FROM eclipse-temurin:17-jre-jammy
-WORKDIR /worker
-COPY --from=build /worker/target/*.jar worker.jar
-# No ports exposed (worker is background)
-ENTRYPOINT ["java", "-jar", "/worker/worker.jar"]
+# 1. Copy the *entire* repo in, so the root POM and all modules are present
+COPY . .
+
+# 2. Build only the `worker` sub-module (and anything it depends on)
+#    -pl = build *this* module
+#    -am = also build its module dependencies
+RUN mvn clean package -pl worker -am -DskipTests
+
+# ── Run stage ────────────────────────────────────────────────────────────────
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+
+# 3. Copy in the built JAR from the builder
+COPY --from=builder /workspace/worker/target/worker-*.jar app.jar
+
+ENTRYPOINT ["java","-jar","app.jar"]
+
