@@ -1,0 +1,9 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AllowModifyVpcAttribute",
+    "Effect": "Allow",
+    "Action": "ec2:ModifyVpcAttribute",
+    "Resource": "arn:aws:ec2:eu-west-1:472842289688:vpc/vpc-08f5d0285344075ea"
+  }]
+}
