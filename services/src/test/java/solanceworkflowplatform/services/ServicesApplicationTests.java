@@ -31,16 +31,16 @@ class ServicesApplicationTests {
 
         // Verify that the deserialization worked correctly
         assertNotNull(request);
-        assertNotNull(request.getTransactedAt());
-        assertEquals(Instant.parse("2025-05-05T16:00:00Z"), request.getTransactedAt());
+        assertNotNull(request.transactedAt());
+        assertEquals(Instant.parse("2025-05-05T16:00:00Z"), request.transactedAt());
 
         // Verify other fields were also deserialized correctly
-        assertEquals("user123", request.getUserId());
-        assertEquals("acc456", request.getAccountId());
-        assertEquals("USD", request.getCurrency());
-        assertEquals(100.0, request.getAmount());
-        assertEquals("IBAN123", request.getBeneficiaryIban());
-        assertEquals("REF123", request.getPaymentRef());
-        assertEquals("PURPOSE123", request.getPurposeRef());
+        assertEquals("user123", request.userId());
+        assertEquals("acc456", request.accountId());
+        assertEquals("USD", request.currency());
+        assertEquals(100.0, request.amount());
+        assertEquals("IBAN123", request.beneficiaryIban());
+        assertEquals("REF123", request.paymentRef());
+        assertEquals("PURPOSE123", request.purposeRef());
     }
 }
