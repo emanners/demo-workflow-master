@@ -4,13 +4,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
+import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
 import software.amazon.awssdk.services.eventbridge.model.PutEventsRequest;
 import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;
+import solanceworkflowplatform.services.model.WorkflowEventRecord;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -74,5 +78,15 @@ public class WorkflowService {
         );
 
         return Mono.just(eventId);
+    }
+
+    public Flux<WorkflowEventRecord> listEvents() {
+        return Flux.defer(() -> {
+            ScanResponse resp = dynamo.scan(ScanRequest.builder()
+                    .tableName(tableName)
+                    .build());
+            return Flux.fromIterable(resp.items())
+                    .map(WorkflowEventRecord::fromDynamo);
+        });
     }
 }

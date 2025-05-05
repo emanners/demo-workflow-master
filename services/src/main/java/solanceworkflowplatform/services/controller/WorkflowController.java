@@ -1,15 +1,10 @@
 package solanceworkflowplatform.services.controller;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import solanceworkflowplatform.services.model.DepositRequest;
-import solanceworkflowplatform.services.model.OpenAccountRequest;
-import solanceworkflowplatform.services.model.PaymentInstructionRequest;
-import solanceworkflowplatform.services.model.RegisterRequest;
+import solanceworkflowplatform.services.model.*;
 import solanceworkflowplatform.services.service.WorkflowService;
 
 
@@ -50,5 +45,9 @@ public class WorkflowController {
             @RequestBody PaymentInstructionRequest req) {
         return service.submit(PaymentInstructionRequest.EVENT_TYPE, req)
                 .map(id -> ResponseEntity.ok(Map.of("eventId", id)));
+    }
+    @GetMapping("/events")
+    public Flux<WorkflowEventRecord> listEvents() {
+        return service.listEvents();
     }
 }
