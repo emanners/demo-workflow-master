@@ -8,6 +8,7 @@
         <version>3.4.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
+    <packaging>pom</packaging>
     <groupId>com.solance</groupId>
     <artifactId>solance-workflow-platform</artifactId>
     <version>0.0.1-SNAPSHOT</version>
