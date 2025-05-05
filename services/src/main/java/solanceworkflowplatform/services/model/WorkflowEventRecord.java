@@ -15,7 +15,7 @@ public class WorkflowEventRecord {
     public static WorkflowEventRecord fromDynamo(Map<String, AttributeValue> item) {
         WorkflowEventRecord r = new WorkflowEventRecord();
         r.setEventId(item.get("eventId").s());
-        r.setDetailType(item.get("detailType").s());
+        r.setDetailType(item.get("type").s());
         r.setStatus(item.get("status").s());
         return r;
     }
