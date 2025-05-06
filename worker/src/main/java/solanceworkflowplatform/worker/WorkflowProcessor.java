@@ -16,7 +16,6 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 import io.awspring.cloud.sqs.annotation.SqsListener;
 
 
-
 import java.util.Map;
 
 @Component
@@ -40,7 +39,7 @@ public class WorkflowProcessor {
     @SqsListener("${sqs.queue.workflow.name}")
     public void onEvent(String raw) {
         logger.info("Received workflow event from SQS");
-        logger.debug("Raw event data: {}", raw);
+        logger.info("Raw event data: {}", raw);
 
         WorkflowEvent evt;
         try {
