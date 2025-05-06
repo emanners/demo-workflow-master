@@ -43,9 +43,17 @@ public class WorkflowProcessor {
 
         WorkflowEvent evt;
         try {
-            JsonNode envelope = mapper.readTree(raw);
-            evt = mapper.treeToValue(envelope.get("detail"), WorkflowEvent.class);
-            logger.info("Parsed workflow event: type={}, eventId={}", evt.detailType(), evt.eventId());
+            JsonNode root = mapper.readTree(raw);
+
+            // if it's an EventBridge envelope, the actual event is in "detail"
+            JsonNode payload = root.has("detail")
+                    ? root.get("detail")
+                    : root;              // otherwise assume the body _is_ the event
+
+            evt = mapper.treeToValue(payload, WorkflowEvent.class);
+            logger.info("Parsed workflow event: type={}, eventId={}",
+                    evt.detailType(), evt.eventId());
+
         } catch (Exception e) {
             logger.error("Failed to parse workflow event", e);
             return;
