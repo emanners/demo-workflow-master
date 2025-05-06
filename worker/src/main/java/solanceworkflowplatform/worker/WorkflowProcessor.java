@@ -43,7 +43,7 @@ public class WorkflowProcessor {
             return;
         }
 
-        switch (evt.getDetailType()) {
+        switch (evt.detailType()) {
             case RegisterRequest.EVENT_TYPE:
                 handleRegister(evt);
                 break;
@@ -61,7 +61,7 @@ public class WorkflowProcessor {
         }
 
         // mark the workflow event as completed
-        updateStatus(evt.getEventId(), "COMPLETED");
+        updateStatus(evt.eventId(), "COMPLETED");
     }
 
     private void handleRegister(WorkflowEvent evt) {
