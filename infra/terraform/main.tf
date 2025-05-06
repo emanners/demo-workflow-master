@@ -426,6 +426,31 @@ resource "aws_iam_role_policy_attachment" "worker_sqs_policy_attach" {
   policy_arn = aws_iam_policy.worker_sqs_policy.arn
 }
 
+# in infra/terraform/main.tf (or wherever you define the ECS task role)
+
+# a little inline policy for SQS
+resource "aws_iam_role_policy" "ecs_task_sqs" {
+  name = "solance-cluster-ecs-task-sqs"
+  role = aws_iam_role.ecs_task_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:SendMessageBatch",
+          "sqs:GetQueueUrl",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.workflow.arn
+      }
+    ]
+  })
+}
+
+
 
 // EventBridge Bus
 resource "aws_cloudwatch_event_bus" "workflow" {
