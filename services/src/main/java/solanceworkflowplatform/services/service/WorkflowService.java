@@ -74,7 +74,7 @@ public class WorkflowService {
         String detail;
         try {
             detail = mapper.writeValueAsString(payload);
-            logger.debug("Serialized payload for EventBridge: eventId={}", eventId);
+            logger.info("Serialized payload for EventBridge: eventId={}", eventId);
         } catch (JsonProcessingException e) {
             logger.error("Failed to serialize payload: eventId={}", eventId, e);
             return Mono.error(new RuntimeException("Failed to serialize payload", e));
@@ -87,13 +87,13 @@ public class WorkflowService {
                 .detail(detail)
                 .build();
 
-        logger.debug("Publishing event to EventBridge: eventBus={}, eventId={}", eventBusName, eventId);
+        logger.info("Publishing event to EventBridge: eventBus={}, eventId={}", eventBusName, eventId);
         try {
             eb.putEvents(PutEventsRequest.builder()
                     .entries(entry)
                     .build()
             );
-            logger.debug("Successfully published event to EventBridge: eventId={}", eventId);
+            logger.info("Successfully published event to EventBridge: eventId={}", eventId);
         } catch (Exception e) {
             logger.error("Failed to publish event to EventBridge: eventId={}", eventId, e);
             return Mono.error(new RuntimeException("Failed to publish event to EventBridge", e));

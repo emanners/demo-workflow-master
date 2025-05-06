@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"      # LocalStack gateway
+      - "8000:8000"      # DynamoDB Local
+    environment:
+      - SERVICES=dynamodb,sqs,events
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - "./.localstack:/tmp/localstack2"

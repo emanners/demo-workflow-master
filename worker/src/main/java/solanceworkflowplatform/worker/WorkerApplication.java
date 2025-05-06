@@ -2,9 +2,11 @@ package solanceworkflowplatform.worker;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @SpringBootApplication
+@EnableScheduling
 public class WorkerApplication {
 
 	public static void main(String[] args) {
@@ -14,5 +16,4 @@ public class WorkerApplication {
 	public void keepAlive() {
 		// no-op: just prevents the container from exiting
 	}
-
 }

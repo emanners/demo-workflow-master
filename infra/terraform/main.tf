@@ -420,3 +420,4 @@ output "event_bus" {
   description = "EventBridge bus name"
   value       = aws_cloudwatch_event_bus.workflow.name
 }
+
