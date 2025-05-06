@@ -9,3 +9,13 @@ aws ecs update-service \
   --service solance-cluster-worker \
   --force-new-deployment \
   --region eu-west-1
+
+
+  curl -v -X POST \
+    -H "Content-Type: application/json" \
+    -d '{
+      "userId":"liveTest1",
+      "fullName":"Live Tester",
+      "email":"live@example.com"
+    }' \
+    http://$ALB_URL/api/v1/register
