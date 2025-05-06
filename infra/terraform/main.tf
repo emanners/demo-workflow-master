@@ -400,6 +400,32 @@ resource "aws_iam_role_policy_attachment" "ecs_exec_ecr_managed" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_policy" "worker_sqs_policy" {
+  name        = "${var.cluster_name}-worker-sqs-policy"
+  description = "Allow access to SQS for Worker"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = aws_sqs_queue.workflow.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_sqs_policy_attach" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.worker_sqs_policy.arn
+}
+
 
 // EventBridge Bus
 resource "aws_cloudwatch_event_bus" "workflow" {
