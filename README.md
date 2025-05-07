@@ -194,7 +194,6 @@ curl -i http://solance-cluster-alb-1606409103.eu-west-1.elb.amazonaws.com/api/v1
 ]
 ```
 
-> **Note:** This is a truncated response. The actual response may contain more events.
 
 > **Note:** Event status will typically show as "RECEIVED" when initially processed by the API layer, and "COMPLETED" after being processed by the workflow processor.
 
