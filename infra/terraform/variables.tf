@@ -15,11 +15,11 @@ variable "cluster_name" {
 variable "api_image" {
   description = "Docker image URI for the API service"
   type        = string
-  default     = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/solance-api:latest"
+  default     = "472842289688.dkr.ecr.eu-west-1.amazonaws.com/solance-api:latest"
 }
 
 variable "worker_image" {
   description = "Docker image URI for the Worker service"
   type        = string
-  default     = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/solance-worker:latest"
+  default     = "472842289688.dkr.ecr.eu-west-1.amazonaws.com/solance-worker:latest"
 }

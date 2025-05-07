@@ -1,0 +1,16 @@
+
+{
+  "version": "0",
+  "id": "11111111-2222-3333-4444-555555555555",
+  "detail-type": "Payout",
+  "source": "solance.platform",
+  "account": "472842289688",
+  "time": "2025-05-06T16:30:00Z",
+  "region": "eu-west-1",
+  "resources": [],
+  "detail": {
+    "userId":"smoke1",
+    "fullName":"Smoke Tester",
+    "email":"smoke@example.com"
+  }
+}

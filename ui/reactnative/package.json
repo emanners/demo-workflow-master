@@ -1,0 +1,56 @@
+{
+  "name": "reactnative",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios --no-packager",
+    "ios-terminal": "react-native run-ios --terminal=Terminal",
+    "lint": "eslint .",
+    "start": "react-native start",
+    "test": "jest",
+    "dev-ios": "npm run start & npm run ios",
+    "setup-xcode": "echo 'Running: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer' && sudo xcode-select -s /Applications/Xcode.app/Contents/Developer",
+    "web": "webpack serve --config webpack.config.js --mode development",
+    "web-build": "webpack --config webpack.config.js --mode production"
+  },
+  "dependencies": {
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-dom": "19.0.0",
+    "react-native-web": "^0.19.10"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "18.0.0",
+    "@react-native-community/cli-platform-android": "18.0.0",
+    "@react-native-community/cli-platform-ios": "18.0.0",
+    "@react-native/babel-preset": "0.79.2",
+    "@react-native/eslint-config": "0.79.2",
+    "@react-native/metro-config": "0.79.2",
+    "@react-native/typescript-config": "0.79.2",
+    "@types/jest": "^29.5.13",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/react-test-renderer": "^19.0.0",
+    "babel-loader": "^9.1.3",
+    "css-loader": "^6.10.0",
+    "eslint": "^8.19.0",
+    "html-webpack-plugin": "^5.6.0",
+    "jest": "^29.6.3",
+    "prettier": "2.8.8",
+    "react-test-renderer": "19.0.0",
+    "style-loader": "^3.3.4",
+    "typescript": "5.0.4",
+    "url-loader": "^4.1.1",
+    "webpack": "^5.90.3",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

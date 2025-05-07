@@ -8,6 +8,7 @@
         <version>3.4.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
+    <packaging>pom</packaging>
     <groupId>com.solance</groupId>
     <artifactId>solance-workflow-platform</artifactId>
     <version>0.0.1-SNAPSHOT</version>
@@ -64,11 +65,19 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>dynamodb</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sqs</artifactId>
+        </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>eventbridge</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.awspring.cloud</groupId>
+            <artifactId>spring-cloud-aws-starter-sqs</artifactId>
+        </dependency>
+
 
         <!-- JSON serialization -->
         <dependency>
@@ -83,6 +92,12 @@
                 <artifactId>bom</artifactId>
                 <version>2.25.30</version> <!-- or latest GA -->
                 <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.awspring.cloud</groupId>
+                <artifactId>spring-cloud-aws-dependencies</artifactId>
+                <version>3.1.1</version> <type>pom</type>
                 <scope>import</scope>
             </dependency>
         </dependencies>

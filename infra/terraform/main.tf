@@ -33,6 +33,8 @@ module "vpc" {
   private_subnets      = ["10.0.3.0/24", "10.0.4.0/24"]
   enable_nat_gateway   = true
   single_nat_gateway   = true
+  enable_dns_hostnames = true
+  enable_dns_support   = true
 }
 
 # data "aws_availability_zones" "available" {}  <-- removed due to IAM limits
@@ -58,9 +60,39 @@ data "aws_iam_policy_document" "ecs_task_execution_assume" {
   }
 }
 
+resource "aws_iam_policy" "ecs_task_dynamodb" {
+  name        = "solance-cluster-ecs-task-dynamodb"
+  description = "CRUD on the workflow table for ECS tasks"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Scan"
+        ]
+        Resource = aws_dynamodb_table.workflow.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_dynamodb_attach" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_dynamodb.arn
+}
+
 resource "aws_iam_role_policy_attachment" "ecs_exec_attach" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_ecr" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 // IAM Role: ECS Task Role (app permissions)
@@ -143,10 +175,14 @@ resource "aws_security_group" "ecs" {
     security_groups = [aws_security_group.lb.id]
   }
   egress {
+    description = "Allow all outbound (so tasks in private subnets can reach ECR & the Internet)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = [module.vpc.vpc_cidr_block]
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "solance-cluster-ecs-sg"
   }
 }
 
@@ -166,11 +202,12 @@ resource "aws_lb_target_group" "api" {
   target_type = "ip"
 
   health_check {
-    path                = "/health"
+    path                = "/actuator/health"
     interval            = 30
     timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
+    matcher             = "200-399"
   }
   lifecycle {
     create_before_destroy = true
@@ -212,7 +249,8 @@ resource "aws_ecs_task_definition" "api" {
       }
       environment = [
         { name = "DDB_TABLE", value = aws_dynamodb_table.workflow.name },
-        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name }
+        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name },
+        { "name": "AWS_REGION", "value": var.aws_region }
       ]
     }
   ])
@@ -265,7 +303,9 @@ resource "aws_ecs_task_definition" "worker" {
       }
       environment = [
         { name = "DDB_TABLE", value = aws_dynamodb_table.workflow.name },
-        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name }
+        { name = "EVENT_BUS", value = aws_cloudwatch_event_bus.workflow.name },
+        { name: "AWS_REGION", "value": var.aws_region },
+        { name  = "SQS_QUEUE", value = aws_sqs_queue.workflow.name}
       ]
     }
   ])
@@ -297,6 +337,121 @@ resource "aws_dynamodb_table" "workflow" {
   }
 }
 
+# 1. Create the SQS queue
+resource "aws_sqs_queue" "workflow" {
+  name                       = "solance-workflow-queue"
+  visibility_timeout_seconds = 60
+  message_retention_seconds  = 1209600  # 14 days
+}
+
+# 2. Allow EventBridge to send to it
+resource "aws_sqs_queue_policy" "workflow_from_eb" {
+  queue_url = aws_sqs_queue.workflow.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sqs:SendMessage"
+      Resource  = aws_sqs_queue.workflow.arn
+      Condition = {
+        ArnEquals = {
+          "aws:SourceArn" = aws_cloudwatch_event_bus.workflow.arn
+        }
+      }
+    }]
+  })
+}
+
+# 3. Create an EventBridge rule for your four event types
+resource "aws_cloudwatch_event_rule" "workflow" {
+  name        = "workflow-rule"
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+
+  event_pattern = jsonencode({
+    "detail-type": [
+      "RegisterCustomer",
+      "OpenAccount",
+      "Deposit",
+      "Payout"
+    ]
+  })
+}
+
+
+# 4. Point that rule at your SQS queue
+resource "aws_cloudwatch_event_target" "to_sqs" {
+  rule      = aws_cloudwatch_event_rule.workflow.name
+  arn       = aws_sqs_queue.workflow.arn
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+}
+
+# 5. Give EventBridge permission to invoke that target
+resource "aws_cloudwatch_event_permission" "allow_sqs" {
+  principal    = "*"
+  statement_id = "AllowEventBridgeToSendToSQS"
+  action       = "events:PutEvents"
+  event_bus_name = aws_cloudwatch_event_bus.workflow.name
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_ecr_managed" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_policy" "worker_sqs_policy" {
+  name        = "${var.cluster_name}-worker-sqs-policy"
+  description = "Allow access to SQS for Worker"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = aws_sqs_queue.workflow.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_sqs_policy_attach" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.worker_sqs_policy.arn
+}
+
+# in infra/terraform/main.tf (or wherever you define the ECS task role)
+
+# a little inline policy for SQS
+resource "aws_iam_role_policy" "ecs_task_sqs" {
+  name = "solance-cluster-ecs-task-sqs"
+  role = aws_iam_role.ecs_task_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:SendMessageBatch",
+          "sqs:GetQueueUrl",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.workflow.arn
+      }
+    ]
+  })
+}
+
+
+
 // EventBridge Bus
 resource "aws_cloudwatch_event_bus" "workflow" {
   name = "workflow-bus"
@@ -316,3 +471,4 @@ output "event_bus" {
   description = "EventBridge bus name"
   value       = aws_cloudwatch_event_bus.workflow.name
 }
+
