@@ -3,7 +3,6 @@ package solanceworkflowplatform.worker;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.awspring.cloud.messaging.config.annotation.EnableSqs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,21 +40,34 @@ public class WorkflowProcessor {
         logger.info("Received workflow event from SQS");
         logger.info("Raw event data: {}", raw);
 
-        WorkflowEvent evt;
+        WorkflowEvent evt = null;
         try {
             JsonNode root = mapper.readTree(raw);
 
-            // if it's an EventBridge envelope, the actual event is in "detail"
-            JsonNode payload = root.has("detail")
-                    ? root.get("detail")
-                    : root;              // otherwise assume the body _is_ the event
+            // ① Direct-to-SQS: the JSON is already a WorkflowEvent
+            if (root.has("eventId") && root.has("detailType")) {
+                evt = mapper.treeToValue(root, WorkflowEvent.class);
 
-            evt = mapper.treeToValue(payload, WorkflowEvent.class);
-            logger.info("Parsed workflow event: type={}, eventId={}",
-                    evt.detailType(), evt.eventId());
+                // ② EventBridge envelope: find the inner "detail" object
+            } else if (root.has("detail")) {
+                JsonNode inner = root.get("detail");
 
+                // EventBridge uses "detail-type" (hyphen) at the top level,
+                // your own payload has "detailType" inside the detail object.
+                if (inner.has("eventId") && inner.has("detailType")) {
+                    evt = mapper.treeToValue(inner, WorkflowEvent.class);
+                } else {
+                    throw new IllegalArgumentException("Unrecognised event shape");
+                }
+            } else {
+                throw new IllegalArgumentException("Unrecognised event shape");
+            }
+            logger.info("Received workflow event: id={}, type={}", evt.eventId(), evt.detailType());
         } catch (Exception e) {
             logger.error("Failed to parse workflow event", e);
+        }
+        if (evt == null) {
+            logger.warn("Received null workflow event");
             return;
         }
 
