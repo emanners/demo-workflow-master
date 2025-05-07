@@ -56,12 +56,13 @@
 
 ---
 
-## Frontend & Data Visualization
+## Frontend & Data Visualization (see ui/reactnative)
 
-* Adapted the default React Native template and added **React Native Web** support for a hosted web preview (via Netlify).
+* Adapted the default React Native template and added **React Native Web** support for a hosted web preview (via Netlify not working out of the box :-).
 * The app polls the `/events` GET endpoint to render a list of all ingested events.
 * Polling a simple REST API keeps the initial UI implementation minimal, demonstrating end‑to‑end data flow in a single codebase that works on mobile and web.
 * In future, we could swap polling for WebSockets or SSE for real‑time updates.
+* Tested on Android Emulator (I have this setup already from my previous projects)
 
 ---
 
@@ -97,3 +98,73 @@
 * Various AI tools assisted me in building out the boilerplate code, including ci/cd/terraform aspects. 
 * I really enjoyed working on this, apart from some of the tedious security/role issues I encountered :-)
 
+# Solance Workflow Platform API
+
+Base URL:  http://solance-cluster-alb-1606409103.eu-west-1.elb.amazonaws.com
+
+
+---
+
+Register Customer Example
+
+**Endpoint**  
+`POST /api/v1/register`
+
+**Request Body**
+```json
+{
+  "userId":   "alice1",
+  "fullName": "Alice Smith",
+  "email":    "alice@example.com"
+}
+
+Example
+
+curl -i -X POST http://solance-cluster-alb-1606409103.eu-west-1.elb.amazonaws.com/api/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"alice1",
+    "fullName":"Alice Smith",
+    "email":"alice@example.com"
+  }'
+  
+  With a response with a unique eventId:
+  
+  { "eventId": "d3e1f9b2-12ab-4c5d-9e6f-abcdef123456" }
+
+with the same pattern we have also patterns for payout, deposit, etc:
+
+curl -i -X POST http://solance-cluster-alb-1606409103.eu-west-1.elb.amazonaws.com/api/v1/payout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"alice1",
+    "accountId":"acct-001",
+    "currency":"EUR",
+    "amount":100.00,
+    "transactedAt":"2025-05-06T11:00:00Z",
+    "beneficiaryIban":"DE89370400440532013000",
+    "paymentRef":"invoice-123",
+    "purposeRef":"subscription fee"
+  }'
+
+Finally either by running the Android emulator or manually:
+
+curl -i http://solance-cluster-alb-1606409103.eu-west-1.elb.amazonaws.com/api/v1/events
+
+you should see the response mostly COMPLETED ('    "status":"RECEIVED"' by api layer, 'COMPLETED' processed by workflow processor)
+
+[
+  {
+    "eventId":"d3e1f9b2-12ab-4c5d-9e6f-abcdef123456",
+    "detailType":"RegisterCustomer",
+    "status":"COMPLETED"
+  },
+  {
+    "eventId":"a1b2c3d4-5678-90ab-cdef-1234567890ab",
+    "detailType":"Deposit",
+    "status":"RECEIVED"
+  }
+  // …
+]
+
+N.B. if you want to run the full stack locally localstack.sh, docker-compose.yml will get it configured, with mvn using local profile for both modules.
