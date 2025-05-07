@@ -1,21 +1,23 @@
 # Architecture Overview
 
-## Spring Boot Monolith on Fargate for Faster Development
-* Handles all workflow types (Register, OpenAccount, Deposit, Payout) in one self‑contained service.  
+## Spring Boot Monoliths on Fargate for Faster Development
+* Services Module API (Register, OpenAccount, Deposit, Payout) in one self‑contained service aka MessageConsumer. A
+* Another monolith for message processing Worker Module 
   *(Later expand to individual services/containers.)*
 
 ## AWS Fargate + ALB
 * Deploy Dockerized Spring apps without managing servers.
 
 ## Event‑Driven Workflow
-* **API** pushes events to **EventBridge** → **SQS** → **Worker** consumes and updates **DynamoDB**.
+* **API** pushes events to **EventBridge** → **SQS** → **Worker** consumes and updates **DynamoDB**. 
+* However, within the timeframe EventBridge wasn't configured correctly, so reverted to Direct SQS (EB future proofing)
 
 ## DynamoDB
 * Workflow‑events registration.
 
 ---
 
-## API Layer
+## API Layer (Serices module)
 
 * Exposed a single HTTP endpoint per workflow action (register, open‑account, deposit, payout) via a Spring Boot application behind an AWS Application Load Balancer (ALB).
 * Using a small set of REST endpoints kept the design straightforward and fit naturally with React Native’s networking model.
@@ -25,7 +27,7 @@
 
 ## Compute Platform
 
-* Packaged the Spring Boot app and worker as Docker images and deployed them to Amazon ECS on **Fargate**.
+* Packaged the Spring Boot apps: servies and worker as Docker images and deployed them to Amazon ECS on **Fargate**.
 * Fargate removes the need to manage EC2 instances and simplifies capacity planning. It also integrates smoothly with the CI/CD pipeline and IAM roles.
 * This is also a good step in the direction of EKS, if required.
 
@@ -34,7 +36,7 @@
 ## Asynchronous Processing
 
 * All incoming events are published to **Amazon EventBridge** with `detailType` tags and forwarded into an **SQS** queue.
-* A separate “worker” service (another Fargate task) polls that queue, processes events, and updates **DynamoDB**.
+* A separate “worker” service (another Fargate task) processes events, and updates **DynamoDB**.
 * Decoupling the API from long‑running business logic ensures responsiveness and resilience. EventBridge → SQS is a fully managed, highly available pattern that we can extend later to multiple consumers or retries.
 
 ---
@@ -83,3 +85,15 @@
 * Integrate **AWS Cognito** (or OAuth/OIDC) to authenticate users before opening WebSockets or consuming APIs.
 * Cache tokens securely (SecureStore) and retry connections gracefully.
 * Implement graceful error states (offline banners, reconnect prompts) to keep users informed.
+
+## TODOs
+* common code in separate JAR (model, config code) 
+* clean up of properties
+* unit tests are very light
+* restructuring of security/roles in AWS.
+
+## End Notes
+
+* Various AI tools assisted me in building out the boilerplate code, including ci/cd/terraform aspects. 
+* I really enjoyed working on this, apart from some of the tedious security/role issues I encountered :-)
+

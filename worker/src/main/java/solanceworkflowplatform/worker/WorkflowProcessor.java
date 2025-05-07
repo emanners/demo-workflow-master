@@ -38,63 +38,68 @@ public class WorkflowProcessor {
     @SqsListener("${sqs.queue.workflow.name}")
     public void onEvent(String raw) {
         logger.info("Received workflow event from SQS");
-        logger.info("Raw event data: {}", raw);
+        logger.debug("Raw event data: {}", raw);
 
-        WorkflowEvent evt = null;
+        WorkflowEvent evt;
         try {
-            JsonNode root = mapper.readTree(raw);
-
-            // ① Direct-to-SQS: the JSON is already a WorkflowEvent
-            if (root.has("eventId") && root.has("detailType")) {
-                evt = mapper.treeToValue(root, WorkflowEvent.class);
-
-                // ② EventBridge envelope: find the inner "detail" object
-            } else if (root.has("detail")) {
-                JsonNode inner = root.get("detail");
-
-                // EventBridge uses "detail-type" (hyphen) at the top level,
-                // your own payload has "detailType" inside the detail object.
-                if (inner.has("eventId") && inner.has("detailType")) {
-                    evt = mapper.treeToValue(inner, WorkflowEvent.class);
-                } else {
-                    throw new IllegalArgumentException("Unrecognised event shape");
-                }
-            } else {
-                throw new IllegalArgumentException("Unrecognised event shape");
-            }
-            logger.info("Received workflow event: id={}, type={}", evt.eventId(), evt.detailType());
-        } catch (Exception e) {
-            logger.error("Failed to parse workflow event", e);
-        }
-        if (evt == null) {
-            logger.warn("Received null workflow event");
+            evt = parseWorkflowEvent(raw);
+        } catch (Exception ex) {
+            logger.error("Failed to parse workflow event", ex);
             return;
         }
 
-        switch (evt.detailType()) {
-            case RegisterRequest.EVENT_TYPE:
-                logger.info("Processing register request: eventId={}", evt.eventId());
-                handleRegister(evt);
-                break;
-            case OpenAccountRequest.EVENT_TYPE:
-                logger.info("Processing open account request: eventId={}", evt.eventId());
-                handleOpenAccount(evt);
-                break;
-            case DepositRequest.EVENT_TYPE:
-                logger.info("Processing deposit request: eventId={}", evt.eventId());
-                handleDeposit(evt);
-                break;
-            case PaymentInstructionRequest.EVENT_TYPE:
-                logger.info("Processing payment instruction request: eventId={}", evt.eventId());
-                handlePayout(evt);
-                break;
-            default:
-                logger.warn("Unknown event type: {}, eventId={}", evt.detailType(), evt.eventId());
+        try {
+            routeEvent(evt);
+            updateStatus(evt.eventId(), "COMPLETED");
+            logger.info("Workflow event processed successfully: eventId={}", evt.eventId());
+        } catch (Exception ex) {
+            logger.error("Error while handling workflow event: eventId={}", evt.eventId(), ex);
+            updateStatus(evt.eventId(), "FAILED");
+        }
+    }
+
+    /* ---------- helpers ---------------------------------------------------- */
+
+    private WorkflowEvent parseWorkflowEvent(String raw) throws Exception {
+        JsonNode root = mapper.readTree(raw);
+
+        // 1) Direct-to-SQS: payload already matches WorkflowEvent
+        if (root.has("eventId") && root.has("detailType")) {
+            return mapper.treeToValue(root, WorkflowEvent.class);
         }
 
-        // mark the workflow event as completed
-        logger.info("Marking workflow event as completed: eventId={}", evt.eventId());
-        updateStatus(evt.eventId(), "COMPLETED");
+        // 2) EventBridge envelope: unwrap "detail"
+        if (root.has("detail")) {
+            JsonNode inner = root.get("detail");
+            if (inner.has("eventId") && inner.has("detailType")) {
+                return mapper.treeToValue(inner, WorkflowEvent.class);
+            }
+        }
+        throw new IllegalArgumentException("Unsupported event shape");
+    }
+
+    private void routeEvent(WorkflowEvent evt) {
+        logger.info("Routing workflow event: type={}, eventId={}", evt.detailType(), evt.eventId());
+
+        switch (evt.detailType()) {
+            case RegisterRequest.EVENT_TYPE -> {
+                logger.debug("Handling RegisterRequest");
+                handleRegister(evt);
+            }
+            case OpenAccountRequest.EVENT_TYPE -> {
+                logger.debug("Handling OpenAccountRequest");
+                handleOpenAccount(evt);
+            }
+            case DepositRequest.EVENT_TYPE -> {
+                logger.debug("Handling DepositRequest");
+                handleDeposit(evt);
+            }
+            case PaymentInstructionRequest.EVENT_TYPE -> {
+                logger.debug("Handling PaymentInstructionRequest");
+                handlePayout(evt);
+            }
+            default -> logger.warn("Unknown event type: {}, eventId={}", evt.detailType(), evt.eventId());
+        }
     }
 
     private void handleRegister(WorkflowEvent evt) {

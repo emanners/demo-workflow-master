@@ -66,98 +66,100 @@ public class WorkflowService {
         logger.info("Submitting new workflow event: type={}, eventId={}", type, eventId);
         logger.debug("Workflow payload: {}", payload);
 
-        // 1. write initial record to DynamoDB
-        Map<String, AttributeValue> item = new HashMap<>();
-        item.put("eventId", AttributeValue.builder().s(eventId).build());
-        item.put("type", AttributeValue.builder().s(type).build());
-        item.put("status", AttributeValue.builder().s("RECEIVED").build());
-
-        logger.debug("Writing initial record to DynamoDB: table={}, eventId={}", tableName, eventId);
+        // 1. Persist a “RECEIVED” record
         try {
-            dynamo.putItem(PutItemRequest.builder()
-                    .tableName(tableName)
-                    .item(item)
-                    .build()
-            );
-            logger.debug("Successfully wrote initial record to DynamoDB: eventId={}", eventId);
-        } catch (Exception e) {
-            logger.error("Failed to write initial record to DynamoDB: eventId={}", eventId, e);
-            return Mono.error(new RuntimeException("Failed to write initial record to DynamoDB", e));
+            writeInitialRecord(eventId, type);
+        } catch (Exception ex) {
+            return Mono.error(ex);
         }
 
-        // Serialize the payload
-        String detail;
+        // 2. Serialise payload once (needed for EB path)
+        String detailJson;
         try {
-            detail = mapper.writeValueAsString(payload);
-            logger.info("Serialized payload for event: eventId={}", eventId);
-        } catch (JsonProcessingException e) {
-            logger.error("Failed to serialize payload: eventId={}", eventId, e);
-            return Mono.error(new RuntimeException("Failed to serialize payload", e));
+            detailJson = serializePayload(payload, eventId);
+        } catch (Exception ex) {
+            return Mono.error(ex);
         }
 
-        if (useDirectSqs) {
-            try {
-                // Get the queue URL
-                String queueUrl = sqs.getQueueUrl(GetQueueUrlRequest.builder()
-                                .queueName(queueName)
-                                .build())
-                        .queueUrl();
-
-                // Create a proper WorkflowEvent structure
-                WorkflowEvent workflowEvent = new WorkflowEvent(
-                        eventId,
-                        type,
-                        mapper.valueToTree(payload)  // Convert payload to JsonNode
-                );
-
-                // Serialize the WorkflowEvent to JSON
-                String message = mapper.writeValueAsString(workflowEvent);
-
-                // Send the message to SQS
-                logger.info("Sending message directly to SQS: queue={}, eventId={}", queueName, eventId);
-                sqs.sendMessage(SendMessageRequest.builder()
-                        .queueUrl(queueUrl)
-                        .messageBody(message)
-                        .messageAttributes(Map.of(
-                                "eventId", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
-                                        .dataType("String")
-                                        .stringValue(eventId)
-                                        .build(),
-                                "type", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
-                                        .dataType("String")
-                                        .stringValue(type)
-                                        .build()
-                        ))
-                        .build());
-                logger.info("Successfully sent message to SQS: eventId={}", eventId);
-            } catch (Exception e) {
-                logger.error("Failed to send message to SQS: eventId={}", eventId, e);
-                return Mono.error(new RuntimeException("Failed to send message to SQS", e));
+        // 3. Dispatch
+        try {
+            if (useDirectSqs) {
+                sendToSqs(eventId, type, payload);
+            } else {
+                publishToEventBridge(eventId, type, detailJson);
             }
-        } else {
-            // Publish to EventBridge
-            PutEventsRequestEntry entry = PutEventsRequestEntry.builder()
-                    .eventBusName(eventBusName)
-                    .source("com.solance.workflow")
-                    .detailType(type)
-                    .detail(detail)
-                    .build();
-
-            logger.info("Publishing event to EventBridge: eventBus={}, eventId={}", eventBusName, eventId);
-            try {
-                eb.putEvents(PutEventsRequest.builder()
-                        .entries(entry)
-                        .build()
-                );
-                logger.info("Successfully published event to EventBridge: eventId={}", eventId);
-            } catch (Exception e) {
-                logger.error("Failed to publish event to EventBridge: eventId={}", eventId, e);
-                return Mono.error(new RuntimeException("Failed to publish event to EventBridge", e));
-            }
+        } catch (Exception ex) {
+            return Mono.error(ex);
         }
 
         logger.info("Successfully submitted workflow event: eventId={}", eventId);
         return Mono.just(eventId);
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Private helpers                                                       */
+    /* --------------------------------------------------------------------- */
+
+    private void writeInitialRecord(String eventId, String type) {
+        Map<String, AttributeValue> item = Map.of(
+                "eventId", AttributeValue.builder().s(eventId).build(),
+                "type",    AttributeValue.builder().s(type).build(),
+                "status",  AttributeValue.builder().s("RECEIVED").build()
+        );
+
+        logger.debug("Writing initial record to DynamoDB: table={}, eventId={}", tableName, eventId);
+        dynamo.putItem(PutItemRequest.builder()
+                .tableName(tableName)
+                .item(item)
+                .build()
+        );
+    }
+
+    private String serializePayload(Object payload, String eventId) throws JsonProcessingException {
+        String json = mapper.writeValueAsString(payload);
+        logger.info("Serialized payload for event: eventId={}", eventId);
+        return json;
+    }
+
+    private void sendToSqs(String eventId, String type, Object payload) throws Exception {
+        String queueUrl = sqs.getQueueUrl(GetQueueUrlRequest.builder()
+                .queueName(queueName)
+                .build()).queueUrl();
+
+        WorkflowEvent workflowEvent = new WorkflowEvent(
+                eventId,
+                type,
+                mapper.valueToTree(payload) // to JsonNode
+        );
+        String message = mapper.writeValueAsString(workflowEvent);
+
+        logger.info("Sending message directly to SQS: queue={}, eventId={}", queueName, eventId);
+        sqs.sendMessage(SendMessageRequest.builder()
+                .queueUrl(queueUrl)
+                .messageBody(message)
+                .messageAttributes(Map.of(
+                        "eventId", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
+                                .dataType("String").stringValue(eventId).build(),
+                        "type", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
+                                .dataType("String").stringValue(type).build()
+                ))
+                .build());
+        logger.info("Successfully sent message to SQS: eventId={}", eventId);
+    }
+
+    private void publishToEventBridge(String eventId, String type, String detailJson) {
+        PutEventsRequestEntry entry = PutEventsRequestEntry.builder()
+                .eventBusName(eventBusName)
+                .source("com.solance.workflow")
+                .detailType(type)
+                .detail(detailJson)
+                .build();
+
+        logger.info("Publishing event to EventBridge: eventBus={}, eventId={}", eventBusName, eventId);
+        eb.putEvents(PutEventsRequest.builder()
+                .entries(entry)
+                .build());
+        logger.info("Successfully published event to EventBridge: eventId={}", eventId);
     }
 
     public Flux<WorkflowEventRecord> listEvents() {
