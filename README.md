@@ -4,6 +4,7 @@
 * Services Module API (Register, OpenAccount, Deposit, Payout) in one self‑contained service (Message Consumer)
 * Worker Module - For the core processing (Message Processor)
   *(Later expand to individual services/containers.)*
+  *This is setup across 2 AZs*
 
 ## AWS Fargate + ALB
 * Deploy Dockerized Spring apps without managing servers.
