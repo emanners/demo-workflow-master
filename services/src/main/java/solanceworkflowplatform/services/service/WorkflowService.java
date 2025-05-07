@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import solanceworkflowplatform.services.model.WorkflowEvent;
 import solanceworkflowplatform.services.model.WorkflowEventRecord;
 
 import java.util.HashMap;
@@ -95,33 +96,37 @@ public class WorkflowService {
         }
 
         if (useDirectSqs) {
-            // Send directly to SQS
             try {
                 // Get the queue URL
                 String queueUrl = sqs.getQueueUrl(GetQueueUrlRequest.builder()
-                        .queueName(queueName)
-                        .build())
+                                .queueName(queueName)
+                                .build())
                         .queueUrl();
 
-                // Create a message with metadata
-                Map<String, String> messageAttributes = new HashMap<>();
-                messageAttributes.put("eventId", eventId);
-                messageAttributes.put("type", type);
+                // Create a proper WorkflowEvent structure
+                WorkflowEvent workflowEvent = new WorkflowEvent(
+                        eventId,
+                        type,
+                        mapper.valueToTree(payload)  // Convert payload to JsonNode
+                );
+
+                // Serialize the WorkflowEvent to JSON
+                String message = mapper.writeValueAsString(workflowEvent);
 
                 // Send the message to SQS
                 logger.info("Sending message directly to SQS: queue={}, eventId={}", queueName, eventId);
                 sqs.sendMessage(SendMessageRequest.builder()
                         .queueUrl(queueUrl)
-                        .messageBody(detail)
+                        .messageBody(message)
                         .messageAttributes(Map.of(
-                            "eventId", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
-                                .dataType("String")
-                                .stringValue(eventId)
-                                .build(),
-                            "type", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
-                                .dataType("String")
-                                .stringValue(type)
-                                .build()
+                                "eventId", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
+                                        .dataType("String")
+                                        .stringValue(eventId)
+                                        .build(),
+                                "type", software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
+                                        .dataType("String")
+                                        .stringValue(type)
+                                        .build()
                         ))
                         .build());
                 logger.info("Successfully sent message to SQS: eventId={}", eventId);
