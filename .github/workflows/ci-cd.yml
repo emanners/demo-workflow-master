@@ -95,12 +95,4 @@ jobs:
           cd infra/terraform
           terraform apply -auto-approve tfplan
 
-      - name: Force ECS services to pick up new image quick approach vs versioned tags
-        run: |
-          aws ecs update-service --cluster solance-cluster \
-                                 --service solance-api    \
-                                 --force-new-deployment
-          aws ecs update-service --cluster solance-cluster \
-                                 --service solance-worker \
-                                 --force-new-deployment
  
