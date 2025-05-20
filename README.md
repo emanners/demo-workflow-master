@@ -1,5 +1,8 @@
 # Architecture Overview
 
+## System Context Diagram
+![System Context Diagram](system_context.png)
+
 ## Spring Boot Monoliths on Fargate for Faster Development
 * Services Module API (Register, OpenAccount, Deposit, Payout) in one self‑contained service (Message Consumer)
 * Worker Module - For the core processing (Message Processor)
